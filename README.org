@@ -1,0 +1,6 @@
+* Setup
+#+begin_src emacs-lisp :results silent
+  (setenv "JIRA_Instance_URL" (read-string "JIRA Instance URL: "))
+  (setenv "JIRA_API_TOKEN" (read-string "JIRA API Token: "))
+  (setenv "JIRA_API_USERNAME" (read-string "JIRA API Username: "))
+#+end_src

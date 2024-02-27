@@ -1,0 +1,130 @@
+#+begin_ai
+I would like to create an emacs lisp package to provide functions I could use with my spacemacs configuration. I have created a git repository at `~/code/gim-jira` Show me what a skeleton hello world version of the package would look like
+
+[AI]: To create a basic "hello world" Emacs Lisp package, you'll want to create a `.el` file that defines a package with some metadata and provides at least one function. Below is a simple example of what the `gim-jira.el` file could look like:
+
+```emacs-lisp
+;;; gim-jira.el --- A simple Hello World package for JIRA integration
+
+;; Author: Your Name <your.email@example.com>
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "29.q")) ;; Specify dependencies with version numbers
+;; Keywords: jira
+;; URL: https://github.com/yourusername/gim-jira
+
+;; This file is not part of GNU Emacs.
+
+;;; Commentary:
+
+;; gim-jira is a simple Emacs package that provides basic functions
+;; for integrating with JIRA.
+
+;;; Code:
+
+;;;###autoload
+(defun gim-jira-hello-world ()
+  "Print Hello World to the minibuffer."
+  (interactive)
+  (message "Hello World from gim-jira!"))
+
+(provide 'gim-jira)
+
+;; Local Variables:
+;; coding: utf-8
+;; End:
+
+;;; gim-jira.el ends here
+```
+
+Make sure you have this structure:
+
+```
+gim-jira/
+├── gim-jira.el
+```
+
+In your `gim-jira.el`, you start with some comments to provide package metadata such as the author's name, email, the package's version, its dependencies, keywords, and URL to the source repository.
+
+The `;;; Commentary:` section is where you would put a longer explanation of what the package does and how to use it, which will be displayed when someone uses M-x package-install to install your package.
+
+The `;;; Code:` marker indicates where your package's actual code starts. In this skeleton, a single function `gim-jira-hello-world` is defined. The `;;;###autoload` cookie before the function definition tells Emacs to autoload this function upon its first use. This is useful when the function should be available even if the package has not been loaded yet, such as a command meant to be called by the user.
+
+The `(provide 'gim-jira)` line at the bottom signals that the `gim-jira` feature/package has been defined, which allows it to be required from other Emacs Lisp files with `(require 'gim-jira)`.
+
+Finally, the line `;;; gim-jira.el ends here` is a conventional way to indicate the end of the source file.
+
+To make it available to Spacemacs (or vanilla Emacs), you’ll need to put this file in a directory on your `load-path`, or use Spacemacs layer system to load this package.
+
+Note that if you want to distribute your package via MELPA or another package repository, there are a few more steps you would need to follow, like adding a package header and following certain conventions. If that is the case, it would be recommended to read through the guidelines provided by the respective repositories.
+
+[ME]: I want to load this package into my emacs so I can test it. How do I do that?
+
+[AI]: To load your Emacs Lisp package into Emacs to test it, you'll need to make sure the `.el` file is in a location that Emacs can find it—that is, a path listed in Emacs's `load-path` variable. Here's what you need to do:
+
+1. **Set up the load path**:
+   If you haven't already, add the directory containing `gim-jira.el` to your `load-path`. You can do this by adding the following to your `~/.emacs`, `~/.emacs.d/init.el`, or `.spacemacs` inside the `dotspacemacs/user-init` function:
+
+   ```emacs-lisp
+   (add-to-list 'load-path "~/code/gim-jira/")
+   ```
+
+   After adding this line, either restart Emacs or evaluate the expression (`M-x eval-expression RET (add-to-list 'load-path "~/code/gim-jira/") RET`).
+
+2. **Load the file**:
+   - Manually load the file using `M-x load-file RET` and then type the path to your `gim-jira.el` file. This is a one-time load and you'll have to do it each time you start Emacs unless you automate it as described below.
+   - Alternatively, you can require the package in your Emacs configuration file:
+
+   ```emacs-lisp
+   (require 'gim-jira)
+   ```
+
+   The `require` function will look for a file providing `gim-jira`. This will only work after you've configured the `load-path` as described above.
+
+3. **Autoload the command**:
+   Since you've used `;;;###autoload` before your function definition, you can also use the autoload mechanism. The autoload comments will be processed when the package is installed, or you can generate them manually by running `M-x update-directory-autoloads`. If you choose to do this, you wouldn't need to `(require 'gim-jira)` as the function will be loaded when it's called.
+
+4. **Test the function**:
+   After loading the file, you can call the function `gim-jira-hello-world` directly by typing `M-x gim-jira-hello-world RET`.
+
+Remember that editing your `.el` file after loading will require you to load it again to see the changes. You can achieve this by running `M-x load-file` again or by using `M-x eval-buffer` in the buffer where you've edited `gim-jira.el`.
+
+For Spacemacs, you can make use of its layer system to configure and load packages, but for testing purposes, the approach outlined above is often sufficient.
+
+[ME]: How would I reload this file after I made changes
+
+[AI]: To reload your `gim-jira.el` file after making changes, you have several options:
+
+1. **Manually load the file again**:
+   - Open the `gim-jira.el` file in Emacs.
+   - After making your changes, save the file.
+   - Use `M-x load-file RET`, then provide the path to your `gim-jira.el` file, or simply press `RET` if you are currently visiting the file in the buffer.
+
+2. **Evaluate the buffer**:
+   - Open the `gim-jira.el` file in Emacs.
+   - Make your changes and save the file.
+   - With the buffer containing `gim-jira.el` active, use `M-x eval-buffer`. This will evaluate all Emacs Lisp expressions in the buffer.
+
+3. **Use 'eval-region' to reload only part of the file**:
+   - If you only changed a specific part of the file (like a particular function), you can highlight that region of text and use `M-x eval-region`. This will only evaluate the highlighted Emacs Lisp expressions.
+
+4. **Automatic reloading with 'auto-revert-mode'** (not typical for `.el` files):
+   If you're actively developing and testing a package, you might want an Emacs buffer to automatically detect changes made to the file on disk and reload the buffer content. To activate this mode, use `M-x auto-revert-mode` while in the buffer. Note that this only updates the buffer with changes from the file system. To apply the changes to Emacs's environment, you will still need to evaluate the buffer or use `load-file`.
+
+For a slightly more automated and error-proof development cycle, you can write a command in your Emacs configuration that loads the package file and binds it to a key combination:
+
+```emacs-lisp
+(defun reload-gim-jira ()
+  "Reloads the `gim-jira.el` file."
+  (interactive)
+  (load-file "~/code/gim-jira/gim-jira.el"))
+
+(global-set-key (kbd "C-c r j") #'reload-gim-jira)
+```
+
+After evaluating the above lines or placing them in your Emacs configuration (`init.el`, `.emacs`, `.spacemacs`), you could simply press `C-c r j` to reload your package file.
+
+Lastly, remember that certain changes (such as changes to macros or changes to autoloaded functions) might not be correctly applied when simply reloading the package. In these cases, restarting Emacs may be necessary to ensure that you are testing the package in a clean state.
+
+[ME]: 
+#+end_ai
+
