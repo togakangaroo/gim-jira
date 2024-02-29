@@ -41,6 +41,11 @@
   :type 'string
   :group 'gim-jira)
 
+(defcustom gim-jira/property-for-issue-description-prefix "gim-jira-issue-description-prefix"
+  "Property to be searched for that can optionally contain a prefix to use for all descriptions."
+  :type 'string
+  :group 'gim-jira)
+
 ;;;###autoload
 (defun gim-jira/standard-headers ()
   "Standard set of headers - including authentication - to be appended to all requests."
@@ -49,6 +54,11 @@
                              (base64-encode-string it 't)
                              (format "Basic %s" it)))))
 
+(cl-defun gim-jira/-org-get-current-property (property-name &optional &key (inherit 't) (default nil))
+  "Get the currently available property value, inheriting by default"
+  (or (org-entry-get (point) property-name 't) default))
+
+;;;###autoload
 (cl-defun gim-jira/create-or-update-issue-from-heading (&optional heading-pos (buffer (current-buffer)))
   "For heading at the char, either create or update the jira issue in the heading denoted by the position. If no heading-pos provided, use the heading we are currently in."
   (interactive)
@@ -61,9 +71,11 @@
               ((heading ...) (-flatten-n 3 (list element-title)))) ; element title might be a string or a list where we need the first element
         (goto-char heading-pos)
         (org-next-block 1)
-        (-let* ((issue-description (org-element-property :value (org-element-at-point)))
-                (parent-issue-key (org-entry-get (point) gim-jira/property-for-jira-issue-parent-key 't))
-                (current-issue-key (org-entry-get (point) gim-jira/property-for-jira-issue-key 't))
+        (-let* ((description-prefix (gim-jira/-org-get-current-property gim-jira/property-for-issue-description-prefix :default ""))
+                (parent-issue-key (gim-jira/-org-get-current-property gim-jira/property-for-jira-issue-parent-key))
+                (current-issue-key (gim-jira/-org-get-current-property gim-jira/property-for-jira-issue-key))
+                (issue-description (format "%s%s" description-prefix
+                                                  (org-element-property :value (org-element-at-point))))
                 ((confirm-question verb extra-fields) (cond (current-issue-key `(,(format "Would you like to update issue %s? " current-issue-key)
                                                                                  "PUT"
                                                                                  nil))
@@ -89,11 +101,11 @@
           (-let* ((url (format "%s/rest/api/2/issue/%s" gim-jira/jira-instance-url
                                (or current-issue-key "")))
                   (res (request url 
-                           :type verb
-                           :data json-payload
-                           :sync t
-                           :parser 'json-read
-                           :headers (gim-jira/standard-headers)))
+                         :type verb
+                         :data json-payload
+                         :sync t
+                         :parser 'json-read
+                         :headers (gim-jira/standard-headers)))
                   (res-data (request-response-data res))
                   (new-issue-key (alist-get 'key res-data)))
             (message (format "Response: %s" res-data))
