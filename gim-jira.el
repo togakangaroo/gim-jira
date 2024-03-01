@@ -66,13 +66,14 @@
   (save-excursion
     (unless heading-pos
       (setq heading-pos (org-back-to-heading)))
+
     (-let* ((element-title (org-element-property :title (org-element-at-point)))
             ((heading ...) (-flatten-n 3 (list element-title)))) ; element title might be a string or a list where we need the first element
       (goto-char heading-pos)
       (org-next-block 1)
-      (-let* ((description-prefix (gim-jira/-org-get-current-property gim-jira/property-for-issue-description-prefix :default ""))
-              (parent-issue-key (gim-jira/-org-get-current-property gim-jira/property-for-jira-issue-parent-key))
-              (current-issue-key (gim-jira/-org-get-current-property gim-jira/property-for-jira-issue-key))
+      (-let* ((description-prefix (gj/-org-get-current-property gjpf-issue-description-prefix :default ""))
+              (parent-issue-key (gj/-org-get-current-property gjpf-jira-issue-parent-key))
+              (current-issue-key (gj/-org-get-current-property gjpf-jira-issue-key))
               (issue-description (format "%s%s" description-prefix
                                        (org-element-property :value (org-element-at-point))))
               ((confirm-question verb extra-fields) (cond (current-issue-key `(,(format "Would you like to update issue %s? " current-issue-key)
@@ -96,25 +97,27 @@
           (read-only-mode)
           (pop-to-buffer (current-buffer))
           (unless (y-or-n-p confirm-question)
-            (cl-return-from gim-jira/create-or-update-issue-from-heading)))
-        (-let* ((url (format "%s/rest/api/2/issue/%s" gim-jira/jira-instance-url
+            (cl-return-from gj/create-or-update-issue-from-heading)))
+        (-let* ((url (format "%s/rest/api/2/issue/%s" gj/jira-instance-url
                              (or current-issue-key "")))
                 (res (request url 
                        :type verb
                        :data json-payload
                        :sync t
                        :parser 'json-read
-                       :headers (gim-jira/standard-headers)))
+                       :headers (gj/standard-headers)))
                 (res-data (request-response-data res))
                 (new-issue-key (alist-get 'key res-data)))
           (message (format "Response: %s" res-data))
           (when new-issue-key
-            (org-entry-put nil gim-jira/property-for-jira-issue-key new-issue-key)))))))
+            (org-entry-put nil gjpf-jira-issue-key new-issue-key)))))))
 
 (provide 'gim-jira)
 
 ;; Local Variables:
 ;; coding: utf-8
+;; read-symbol-shorthands: (("gj/" . "gim-jira/")
+;;                          ("gjpf-" . "gim-jira/property-for-"))
 ;; End:
 
 ;;; gim-jira.el ends here
