@@ -50,13 +50,24 @@
 (defun gim-jira/standard-headers ()
   "Standard set of headers - including authentication - to be appended to all requests."
   `(("Content-Type" . "application/json")
-    ("Authorization" . ,(--> (format "%s:%s" gim-jira/jira-username gim-jira/jira-api-token)
+    ("Authorization" . ,(--> (format "%s:%s" gj/jira-username gim-jira/jira-api-token)
                              (base64-encode-string it 't)
                              (format "Basic %s" it)))))
 
 (cl-defun gim-jira/-org-get-current-property (property-name &optional &key (inherit 't) (default nil))
   "Get the currently available property value, inheriting by default"
   (or (org-entry-get (point) property-name 't) default))
+
+(cl-defun gj/-request (api-action &optional &key (type "GET") params)
+  (-let* ((url (format "%s/rest/api/3/%s" gj/jira-instance-url api-action))
+          (res (request url
+                :type type
+                :params params
+                :sync t
+                :parser 'json-read
+                :headers (gj/standard-headers)))
+          (res-data (request-response-data res)))
+    res-data))
 
 ;;;###autoload
 (cl-defun gim-jira/create-or-update-issue-from-heading (&optional heading-pos (buffer (current-buffer)))
@@ -68,14 +79,15 @@
       (setq heading-pos (org-back-to-heading)))
 
     (-let* ((element-title (org-element-property :title (org-element-at-point)))
-            ((heading ...) (-flatten-n 3 (list element-title)))) ; element title might be a string or a list where we need the first element
+            ((heading ...) (-list element-title))) ; element title might be a string or a list where we need the first element
       (goto-char heading-pos)
       (org-next-block 1)
       (-let* ((description-prefix (gj/-org-get-current-property gjpf-issue-description-prefix :default ""))
               (parent-issue-key (gj/-org-get-current-property gjpf-jira-issue-parent-key))
               (current-issue-key (gj/-org-get-current-property gjpf-jira-issue-key))
-              (issue-description (format "%s%s" description-prefix
-                                       (org-element-property :value (org-element-at-point))))
+              (issue-description (format "%s%s"
+                                         description-prefix
+                                         (org-element-property :value (org-element-at-point))))
               ((confirm-question verb extra-fields) (cond (current-issue-key `(,(format "Would you like to update issue %s? " current-issue-key)
                                                                                "PUT"
                                                                                nil))
@@ -87,9 +99,8 @@
                                                                       (issuetype . ((name . "Tech Task"))))))))
               (payload `((fields . ((description . ,issue-description)
                                     . ,extra-fields))))
-              (foo (message (format "PAYLOAD %s" payload)))
-              ;; (bar (edebug))
               (json-payload (json-encode payload)))
+
         (with-temp-buffer
           (insert json-payload)
           (json-mode)
@@ -98,15 +109,9 @@
           (pop-to-buffer (current-buffer))
           (unless (y-or-n-p confirm-question)
             (cl-return-from gj/create-or-update-issue-from-heading)))
-        (-let* ((url (format "%s/rest/api/2/issue/%s" gj/jira-instance-url
-                             (or current-issue-key "")))
-                (res (request url 
-                       :type verb
-                       :data json-payload
-                       :sync t
-                       :parser 'json-read
-                       :headers (gj/standard-headers)))
-                (res-data (request-response-data res))
+
+        (-let* ((path (format "issue/%s" (or current-issue-key "")))
+                (res-data (gj/-request path :type verb))
                 (new-issue-key (alist-get 'key res-data)))
           (message (format "Response: %s" res-data))
           (when new-issue-key
