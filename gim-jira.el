@@ -15,6 +15,7 @@
 ;;; Code:
 (require 'dash)
 (require 'request)
+(require 'pcache)
 
 (defcustom gim-jira/jira-instance-url (getenv "JIRA_INSTANCE_URL")
   "URL for jira."
@@ -45,6 +46,29 @@
   "Property to be searched for that can optionally contain a prefix to use for all descriptions."
   :type 'string
   :group 'gim-jira)
+
+(defcustom gim-jira/cache-name "gim-jira"
+  "Name of cache used with pcase to store persistent info"
+  :type 'string
+  :group 'gim-jira)
+
+(defvar gj/-known-users
+  (pcache-get (pcache-repository gj/cache-name) 'known-users)
+  "All jira users known by the system.")
+
+;;;###autoload
+(defun gim-jira/refresh-known-users ()
+  "Refresh the list of known users from the server"
+  (interactive)
+  (-let ((new-value (--> "users"
+                         gim-jira/-request
+                         (--map (-let (((&alist 'displayName dn 'accountId id 'emailAddress ea) it))
+                                   `((displayName . ,dn)
+                                     (emailAddress . ,ea)
+                                     (accountId . ,id)))
+                                it))))
+       (pcache-put (pcache-repository gj/cache-name) 'known-users new-value)
+       (setq gj/-known-users new-value)))
 
 ;;;###autoload
 (defun gim-jira/standard-headers ()
@@ -116,6 +140,25 @@
           (message (format "Response: %s" res-data))
           (when new-issue-key
             (org-entry-put nil gjpf-jira-issue-key new-issue-key)))))))
+
+(cl-defun gim-jira/format-user ()
+  (--map (format "%s (%s)" (alist-get 'displayName it)
+                           (or (alist-get 'emailAddress it) ""))
+         gj/-known-users))
+
+(defun gim-jira/-helm-source-users ()
+  "Build the Helm source to insert a reference to one of the current jira users."
+  (helm-build-sync-source "User"
+    :candidates #'gim-jira/format-user
+    :action (helm-make-actions
+             "Print user" (lambda (user)
+                            (message "Selected user: %s" user)
+                            user))))
+
+(defun gim-jira/helm-select-user ()
+  "Use Helm to select a user from the `gim-temp/users` list."
+  (interactive)
+  (helm :sources (gim-jira/-helm-source-users) :buffer "*helm select user*"))
 
 (provide 'gim-jira)
 
