@@ -60,8 +60,7 @@
 (defun gim-jira/refresh-known-users ()
   "Refresh the list of known users from the server"
   (interactive)
-  (-let ((new-value (--> "users"
-                         gim-jira/-request
+  (-let ((new-value (--> (gim-jira/-request "users" :params '((maxResults . 500)))
                          (--map (-let (((&alist 'displayName dn 'accountId id 'emailAddress ea) it))
                                    `((displayName . ,dn)
                                      (emailAddress . ,ea)
@@ -141,19 +140,19 @@
           (when new-issue-key
             (org-entry-put nil gjpf-jira-issue-key new-issue-key)))))))
 
-(cl-defun gim-jira/format-user ()
-  (--map (format "%s (%s)" (alist-get 'displayName it)
-                           (or (alist-get 'emailAddress it) ""))
-         gj/-known-users))
+(cl-defun gim-jira/format-user-for-selection (user)
+  "Format a user for selection"
+  (format "%s (%s)" (alist-get 'displayName user)
+                    (or (alist-get 'emailAddress user) "")))
 
 (defun gim-jira/-helm-source-users ()
   "Build the Helm source to insert a reference to one of the current jira users."
   (helm-build-sync-source "User"
-    :candidates #'gim-jira/format-user
+    :candidates (--map `(,(gj/format-user-for-selection it), it)
+                       gj/-known-users)
     :action (helm-make-actions
              "Print user" (lambda (user)
-                            (message "Selected user: %s" user)
-                            user))))
+                            (message "Selected user: %s" user)))))
 
 (defun gim-jira/helm-select-user ()
   "Use Helm to select a user from the `gim-temp/users` list."
