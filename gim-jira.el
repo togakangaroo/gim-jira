@@ -60,7 +60,7 @@
 (defun gim-jira/refresh-known-users ()
   "Refresh the list of known users from the server"
   (interactive)
-  (-let ((new-value (--> (gim-jira/-request "users" :params '((maxResults . 500)))
+  (-let ((new-value (--> (gj/-request "users" :params '((maxResults . 500)))
                          (--map (-let (((&alist 'displayName dn 'accountId id 'emailAddress ea) it))
                                    `((displayName . ,dn)
                                      (emailAddress . ,ea)
@@ -81,16 +81,16 @@
   "Get the currently available property value, inheriting by default"
   (or (org-entry-get (point) property-name 't) default))
 
-(cl-defun gj/-request (api-action &optional &key (type "GET") params)
-  (-let* ((url (format "%s/rest/api/3/%s" gj/jira-instance-url api-action))
+(cl-defun gj/-request (api-action &optional &key (type "GET") params data (api-version 3))
+  (-let* ((url (format "%s/rest/api/%s/%s" gj/jira-instance-url api-version api-action))
           (res (request url
                 :type type
                 :params params
+                :data data
                 :sync t
                 :parser 'json-read
-                :headers (gj/standard-headers)))
-          (res-data (request-response-data res)))
-    res-data))
+                :headers (gj/standard-headers))))
+    (request-response-data res)))
 
 ;;;###autoload
 (cl-defun gim-jira/create-or-update-issue-from-heading (&optional heading-pos (buffer (current-buffer)))
@@ -105,7 +105,9 @@
             ((heading ...) (-list element-title))) ; element title might be a string or a list where we need the first element
       (goto-char heading-pos)
       (org-next-block 1)
-      (-let* ((description-prefix (gj/-org-get-current-property gjpf-issue-description-prefix :default ""))
+      (-let* ((description-prefix (--> gjpf-issue-description-prefix
+                                       (gj/-org-get-current-property it :default "")
+                                       (s-replace-all '(("\\n" . "\n")) it)))
               (parent-issue-key (gj/-org-get-current-property gjpf-jira-issue-parent-key))
               (current-issue-key (gj/-org-get-current-property gjpf-jira-issue-key))
               (issue-description (format "%s%s"
@@ -134,7 +136,7 @@
             (cl-return-from gj/create-or-update-issue-from-heading)))
 
         (-let* ((path (format "issue/%s" (or current-issue-key "")))
-                (res-data (gj/-request path :type verb))
+                (res-data (gj/-request path :type verb :data json-payload :api-version 2))
                 (new-issue-key (alist-get 'key res-data)))
           (message (format "Response: %s" res-data))
           (when new-issue-key
@@ -152,7 +154,8 @@
                        gj/-known-users)
     :action (helm-make-actions
              "Print user" (lambda (user)
-                            (message "Selected user: %s" user)))))
+                            (message "Selected user: %s" user)
+                            (insert (format "[~accountId:%s]" (alist-get 'accountId (car user))))))))
 
 (defun gim-jira/helm-select-user ()
   "Use Helm to select a user from the `gim-temp/users` list."
